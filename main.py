@@ -499,7 +499,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-
 # Clean up GPIO
 servo_1.stop()
 servo_2.stop()
