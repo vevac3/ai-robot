@@ -224,6 +224,9 @@ def recognize_speech():
         except sr.UnknownValueError:
             print("Sorry, I did not get that")
             return None
+        
+def Introduction():
+    text_to_speech("Hi, my name is Jarvis. I am made by Swarnava. I am an multifunctional robot ")
 
 # Functions for Arm Movements
 def wave_arm():
@@ -376,6 +379,31 @@ def play_youtube_video(url):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
     subprocess.call(['omxplayer', 'video.mp4'])
+def show_emotions():
+    emotions = {
+        "happy": "happy_eyes.jpg",
+        "sad": "sad_eyes.jpg",
+        "surprised": "surprised_eyes.jpg",
+        "angry": "angry_eyes.jpg"
+    }
+
+    while True:
+        for emotion, image_file in emotions.items():
+            # Load and display the image
+            img = cv2.imread(image_file)
+            if img is None:
+                print(f"Error: Image {image_file} not found.")
+                continue
+            cv2.imshow("Robot Emotion", img)
+
+            # Display each emotion for 2 seconds
+            key = cv2.waitKey(2000)
+
+            # If 'q' is pressed, exit loop
+            if key == ord('q'):
+                cv2.destroyAllWindows()
+                return
+
 
 # Spotify Playback
 def play_spotify_song(song_name):
@@ -397,6 +425,8 @@ if True:
 
         if "wave" in command:
             wave_arm()
+        elif "introduce" in command:
+            Introduction()
         elif "point" in command:
             point_arm()
         elif "pick up" in command:
@@ -454,6 +484,8 @@ def execute_chatgpt_command(command):
     elif "sort" in command:
         item_color = command.split(" ")[-1]
         sort_items(item_color)
+    elif "introduce" in command:
+            Introduction()
     elif "wave" in command:
         wave_arm()
     elif "point" in command:
