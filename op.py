@@ -1,4 +1,5 @@
 import time
+import vlc
 import RPi.GPIO as GPIO
 import google.generativeai as genai
 import cv2
@@ -24,20 +25,23 @@ IN4 = 23  # Motor B Input 2
 ENA = 24  # Motor A Enable
 ENB = 25  # Motor B Enable
 # Set up GPIO pins for Line Following Sensors
-left_sensor_pin = 27
+left_sensor_pin = 7
 right_sensor_pin = 8
+
+#Ir pin
+IR_PIN = 4
 
 # Define GPIO pins for ultrasonic sensors
 TRIG_FRONT = 5
 ECHO_FRONT = 6
-TRIG_LEFT = 23
+TRIG_LEFT = 13
 ECHO_LEFT = 19
 TRIG_RIGHT = 26
 ECHO_RIGHT = 21
-TRIG_BACK1 = 22
-ECHO_BACK1 = 26
-TRIG_BACK2 = 24
-ECHO_BACK2 = 25
+TRIG_BACK1 = 2
+ECHO_BACK1 = 3
+TRIG_BACK2 = 18
+ECHO_BACK2 = 12
 
 # Setup GPIO pins
 GPIO.setup(TRIG_FRONT, GPIO.OUT)
@@ -60,30 +64,38 @@ GPIO.setup(ENA, GPIO.OUT)
 GPIO.setup(ENB, GPIO.OUT)
 
 # Set up GPIO pins for servo motors
-servo_1 = 11
-servo_2 = 7
-servo_3 = 22
-servo_4 = 13
+servo_11 = 16
+servo_22 = 10
+servo_33 = 9
+servo_44 = 11
+servo_55  = 20
+servo_66 = 1
+GPIO.setup(servo_11, GPIO.OUT)
+GPIO.setup(servo_22, GPIO.OUT)
+GPIO.setup(servo_33, GPIO.OUT)
+GPIO.setup(servo_44, GPIO.OUT)
+GPIO.setup(servo_55, GPIO.OUT)
+GPIO.setup(servo_66, GPIO.OUT)
 
-GPIO.setup(servo_1, GPIO.OUT)
-GPIO.setup(servo_2, GPIO.OUT)
-GPIO.setup(servo_3, GPIO.OUT)
-GPIO.setup(servo_4, GPIO.OUT)
+
 
 
 
 
 # Initialize PWM on each servo pin at 50Hz
-left_arm_vertical_pwm = GPIO.PWM(servo_1, 50)
-left_arm_grab_pwm = GPIO.PWM(servo_2, 50)
-right_arm_vertical_pwm = GPIO.PWM(servo_3, 50)
-right_arm_grab_pwm = GPIO.PWM(servo_4, 50)
+servo_1 = GPIO.PWM(servo_11, 50)
+servo_2 = GPIO.PWM(servo_22, 50)
+servo_3 = GPIO.PWM(servo_33, 50)
+servo_4 = GPIO.PWM(servo_44, 50)
+servo_5 = GPIO.PWM(servo_55, 50)
+servo_6 = GPIO.PWM(servo_66, 50)
 
-left_arm_vertical_pwm.start(0)
-left_arm_grab_pwm.start(0)
-right_arm_vertical_pwm.start(0)
-right_arm_grab_pwm.start(0)
-
+servo_1.start(0)
+servo_2.start(0)
+servo_3.start(0)
+servo_4.start(0)
+servo_5.start(0)
+servo_6.start(0)
 
 
 # Function to move servo to a specific angle
@@ -202,28 +214,30 @@ def chat_with_gemini(prompt):
     # Generate a response using the Gemini API
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
-        prompt=prompt,
-        max_output_tokens=150  # Adjust token limits as needed
+        f"{prompt}\n\n reply with plain text only", # Adjust token limits as needed
     )
     return response.text  # Extract the content of the response
 
 def text_to_speech(text):
     tts = gTTS(text=text, lang='en')
     tts.save("response.mp3")
-    os.system("mpg321 response.mp3")
+    p = vlc.MediaPlayer("./response.mp3")
+    p.play()
+    return p
 
 def recognize_speech():
     recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
+
+    with sr.Microphone(device_index=1) as source:
         print("Listening...")
-        audio = recognizer.listen(source)
+        audio = recognizer.listen(source, timeout=5)
         try:
             command = recognizer.recognize_google(audio)
             print(f"Recognized: {command}")
             return command.lower()
         except sr.UnknownValueError:
             print("Sorry, I did not get that")
-            return None
+            return ""
         
 def Introduction():
     text_to_speech("Hi, my name is Jarvis. I am made by Swarnava. I am an multifunctional robot ")
@@ -317,8 +331,8 @@ def capture_and_lock_face():
     pan_angle = 90  # Initial camera position (center)
     tilt_angle = 90
 
-    move_servo(left_arm_vertical_pwm, pan_angle)  # Pan servo control
-    move_servo(left_arm_grab_pwm, tilt_angle)    # Tilt servo control
+    move_servo(servo_6, pan_angle)  # Pan servo control
+    move_servo(servo_6, tilt_angle)    # Tilt servo control
 
     while True:
         ret, frame = video_capture.read()
@@ -347,8 +361,8 @@ def find_person():
 
     pan_angle = 90  # Initial camera position
     tilt_angle = 90
-    move_servo(left_arm_vertical_pwm, pan_angle)  # Pan servo control
-    move_servo(left_arm_grab_pwm, tilt_angle)    # Tilt servo control
+    move_servo(servo_5, pan_angle)  # Pan servo control
+    move_servo(servo_6, tilt_angle)    # Tilt servo control
 
     while True:
         ret, frame = video_capture.read()
@@ -378,28 +392,57 @@ def find_person():
         if tilt_angle > 180:
             tilt_angle = 90  # Reset tilt angle after a full sweep
 
-        move_servo(left_arm_vertical_pwm, pan_angle)  # Adjust pan servo
-        move_servo(left_arm_grab_pwm, tilt_angle)    # Adjust tilt servo
+        move_servo(servo_5, pan_angle)  # Adjust pan servo
+        move_servo(servo_6, tilt_angle)    # Adjust tilt servo
 
     video_capture.release()
 
 # Self-Charging Dock Search
-def move_to_charging_dock():
-    while True:
-        avoid_obstacles()  # Check for obstacles while searching
-        # IR scanning logic here
-        ir_code_received = receive_ir_code()  # Placeholder function
-        if ir_code_received == 0xFFA25D:
-            print("Charging dock found!")
-            text_to_speech("Charging dock found!")
-            # Code to navigate to the charging dock
-            # Code to start charging
-            break
+def get_distance():
+    GPIO.output(TRIG_FRONT, GPIO.HIGH)
+    time.sleep(0.00001)
+    GPIO.output(TRIG_FRONT, GPIO.LOW)
 
-def receive_ir_code():
-    # Placeholder function to receive IR code
-    # Implement IR receiving logic here
-    return None
+    start_time = time.time()
+    stop_time = time.time()
+
+    while GPIO.input(ECHO_FRONT) == 0:
+        start_time = time.time()
+
+    while GPIO.input(ECHO_FRONT) == 1:
+        stop_time = time.time()
+
+    elapsed_time = stop_time - start_time
+    distance = (elapsed_time * 34300) / 2  # Speed of sound in cm/s
+    return distance
+
+def move_to_charging_dock():
+    print("Searching for the charging dock...")
+    while True:
+        # Check IR signal
+        if GPIO.input(IR_PIN) == 1:
+            print("IR signal detected! Approaching the dock.")
+            while True:
+                # Measure distance to dock
+                distance = get_distance()
+                print(f"Distance to dock: {distance:.2f} cm")
+
+                if distance > 30:  # Move closer if dock is far
+                    move_forward()
+                elif 10 < distance <= 30:  # Align if within range
+                    stop()
+                    print("Aligning with the dock...")
+                    time.sleep(1)  # Simulate alignment
+                    move_forward()
+                else:  # Docking complete
+                    stop()
+                    print("Docked successfully!")
+                    return
+
+        else:
+            # Roam and search for the signal
+            print("Roaming...")
+            avoid_obstacle()
 
 def align_to_item():
     front_distance = measure_distance(TRIG_FRONT, ECHO_FRONT)
@@ -461,47 +504,48 @@ def play_spotify_song(song_name):
         text_to_speech("Song not found")
 
 # Main loop to wait for wake word
-if True:
-    command = recognize_speech()
-    if command and "hey titty" in command:
-        text_to_speech("How can I assist you?")
+def blah():
+    while True:
         command = recognize_speech()
+        if command and "jarvis" in command.lower():
+            text_to_speech("Yes?")
+            command = recognize_speech()
 
-        if "wave" in command:
-            wave_arm()
-        elif "introduce" in command:
-            Introduction()
-        elif "point" in command:
-            point_arm()
-        elif "pick up" in command:
-            pick_up_object()
-        elif "expressive gesture" in command:
-            expressive_gesture()
-        elif "dance" in command:
-            dance_move()
-        elif "guide" in command:
-            guide_direction()
-        elif "simon says" in command:
-            simon_says_action()
-        elif "follow the leader" in command:
-            follow_the_leader_action()
-        elif "recognize object" in command:
-            recognize_object()
-        elif "hide and seek" in command:
-            capture_and_lock_face()
-            time.sleep(10)  # Simulate counting to 10
-            find_person()
-        elif "go back to your charging dock" in command:
-            move_to_charging_dock()
-        elif "play youtube video" in command:
-            video_url = "YOUR_YOUTUBE_VIDEO_URL"  # Set your YouTube video URL
-            play_youtube_video(video_url)
-        elif "play spotify song" in command:
-            song_name = "YOUR_SONG_NAME"  # Set your Spotify song name
-            play_spotify_song(song_name)
-        else:
-            response = chat_with_gemini(command)
-            text_to_speech(response)
+            if "wave" in command:
+                wave_arm()
+            elif "introduce" in command:
+                Introduction()
+            elif "point" in command:
+                point_arm()
+            elif "pick up" in command:
+                pick_up_object()
+            elif "expressive gesture" in command:
+                expressive_gesture()
+            elif "dance" in command:
+                dance_move()
+            elif "guide" in command:
+                guide_direction()
+            elif "simon says" in command:
+                simon_says_action()
+            elif "follow the leader" in command:
+                follow_the_leader_action()
+            elif "recognize object" in command:
+                recognize_object()
+            elif "hide" in command:
+                capture_and_lock_face()
+                time.sleep(10)  # Simulate counting to 10
+                find_person()
+            elif "charging dock" in command:
+                move_to_charging_dock()
+            elif "play youtube video" in command:
+                video_url = "YOUR_YOUTUBE_VIDEO_URL"  # Set your YouTube video URL
+                play_youtube_video(video_url)
+            elif "play spotify song" in command:
+                song_name = "YOUR_SONG_NAME"  # Set your Spotify song name
+                play_spotify_song(song_name)
+            else:
+                response = chat_with_gemini(command)
+                text_to_speech(response)
 # Servo Motor Control for Sorting
 def sort_items(item_color):
     print(f"Sorting {item_color} items...")
@@ -510,12 +554,12 @@ def sort_items(item_color):
     align_to_item()
 
     # Use left arm to pick up item
-    move_servo(left_arm_vertical_pwm, 90)  # Move arm down to pick
-    move_servo(left_arm_grab_pwm, 45)  # Close grab to pick item
+    move_servo(servo_5, 90)  # Move arm down to pick
+    move_servo(servo_6, 45)  # Close grab to pick item
 
     # Move arm to place item
-    move_servo(left_arm_vertical_pwm, 0)  # Move arm up with item
-    move_servo(left_arm_grab_pwm, 0)  # Release item
+    move_servo(servo_5, 0)  # Move arm up with item
+    move_servo(servo_6, 0)  # Release item
 
     print(f"Placed {item_color} item in correct spot.")
 
@@ -548,7 +592,7 @@ def execute_chatgpt_command(command):
         follow_the_leader_action()
     elif "recognize object" in command:
         recognize_object()
-    elif "hide and seek" in command:
+    elif "hide" in command:
         capture_and_lock_face()
         time.sleep(10)  # Simulate counting to 10
         find_person()
@@ -563,17 +607,21 @@ def execute_chatgpt_command(command):
     else:
         response = chat_with_gemini(command)
         text_to_speech(response)
-    # Add more functionalities as needed
-
-# Main loop
+    # Add more functionalities
 def main():
-    print("Robot is ready for commands.")
     while True:
-        command = text_to_speech()
-        execute_chatgpt_command(command)
+        print("Say 'exit' to end the program.")
+        user_input = recognize_speech()
+        if user_input and user_input.lower() == "exit":
+            break
+            # Send the transcribed speech to the Gemini chat function
+        response = chat_with_gemini(user_input)
+            # Convert Gemini's response to speech
+        p = text_to_speech(response)
 
+# Run the main loop
 if __name__ == "__main__":
-    main()
+    blah()
 
 # Clean up GPIO
 GPIO.cleanup()
